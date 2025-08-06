@@ -1,5 +1,5 @@
 1. Link for Deploy Three-Tier DevSecOps Kubernetes Project on AWS EKS with ArgoCD, Prometheus, Grafana, Jenkins is: https://codewithmuh.medium.com/deploy-three-tier-devsecops-kubernetes-project-on-aws-eks-with-argocd-prometheus-grafana-jenkins-0484cbee7ba1
-2. Link for Containerizing and Deploying a Three-Tier Application on AWS EKS with Kubernetes is: https://medium.com/@silas.cloudspace/containerizing-and-deploying-a-three-tier-application-on-aws-eks-with-kubernetes-bd9b0eaf2648
+2. Link for Containerizing and Deploying a Three-Tier Application on AWS EKS with Kubernetes is: https://medium.com/@silas.cloudspace/containerizing-and-deploying-a-three-tier-application-on-aws-eks-with-kubernetes-bd9b0eaf2648  (GitHub repo link: https://github.com/Silas-cloudspace/PROJECTS-AWS-EKS)
 
 Note: I have done POC using the second Link and deployed frontend and backend applications except database. so frontend was working fine, but because of no data base, backend application was not able to connect with database and getting logs as below:
 
