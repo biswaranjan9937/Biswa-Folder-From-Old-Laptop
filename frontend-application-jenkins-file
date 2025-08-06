@@ -1,0 +1,99 @@
+def timestamp = new Date().format('yyyyMMdd-HHmmss')
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION     = 'ap-south-1'
+        ECR_REPO       = '663880399834.dkr.ecr.ap-south-1.amazonaws.com'
+        IMAGE_NAME     = 'poc-ecr-frontend'
+    }
+
+    stages {
+        stage('Clean Workspace') {
+            steps {
+                deleteDir()
+            }
+        }
+
+        stage('Checkout Code') {
+            steps {
+                git url: 'https://github.com/biswaranjan9937/frontend-app-mern', branch: 'main'
+                script {
+                    echo "Global timestamp: ${timestamp}"   
+                }
+            }
+        }
+
+        stage('AWS ECR Login') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'aws-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    sh '''
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+                    '''
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                dir('EKS-MERN-Project/student-teacher-app') {
+                    script {
+                        def fullTag = "${env.ECR_REPO}/${env.IMAGE_NAME}:${timestamp}"
+                        sh "docker build -t ${fullTag} -f Dockerfile-Frontend ."
+                    }
+                }
+            }
+        }
+
+        // stage('Tag Docker Image') {
+        //     steps {
+        //         sh 'docker tag ${IMAGE_NAME}:latest ${ECR_REPO}:latest'
+        //     }
+        // }
+
+        stage('Push to ECR') {
+            steps {
+                script {
+                    def fullTag = "${env.ECR_REPO}/${env.IMAGE_NAME}:${timestamp}"
+                    sh "docker push ${fullTag}"
+                }
+            }
+        }
+        stage('Delete Images from Jenkins server') {
+            steps {
+                sh 'docker image prune -a -f'
+            }
+        }
+        stage('Update Manifest and Push to GitHub') {
+            steps {
+                script {
+                    // def timestamp = new Date().format("yyyyMMdd-HHmmss")
+                    def newImage = "${env.ECR_REPO}/${env.IMAGE_NAME}:${timestamp}"
+                    def manifestPath = 'EKS-MERN-Project/DevOps/Kubernetes-Manifests/Frontend/deployment.yaml'
+        
+                    // Corrected sed command
+                    sh "sed -i \"s|image: .*|image: ${newImage}|\" ${manifestPath}"
+        
+                    // Git commit and push
+                    withCredentials([usernamePassword(credentialsId: 'github-creds', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                        sh "git config user.name 'jenkins'"
+                        sh "git config user.email 'jenkins@local'"
+                        sh "git add ${manifestPath}"
+                        sh "git commit -m 'Update image tag of frontend application to ${timestamp}' || echo 'Nothing to commit'"
+                        sh "git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/biswaranjan9937/frontend-app-mern.git HEAD:main"
+                    }
+                }
+            }
+        }
+    }
+    post {
+        success {
+            echo '✅ Build and Push to ECR successful!'
+        }
+        failure {
+            echo '❌ Build failed!'
+        }
+    }
+}
