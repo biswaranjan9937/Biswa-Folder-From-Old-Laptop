@@ -1,0 +1,15 @@
+project: default
+source:
+  repoURL: https://github.com/biswaranjan9937/frontend-app-mern
+  path: EKS-MERN-Project/DevOps/Kubernetes-Manifests/Frontend
+  targetRevision: HEAD
+destination:
+  server: https://kubernetes.default.svc
+  namespace: poc-ui
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ApplyOutOfSyncOnly=true
