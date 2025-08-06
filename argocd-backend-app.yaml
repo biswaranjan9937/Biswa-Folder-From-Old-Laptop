@@ -1,0 +1,15 @@
+project: default
+source:
+  repoURL: https://github.com/biswaranjan9937/backend-app-mern
+  path: EKS-MERN-Project/DevOps/Kubernetes-Manifests/Backend
+  targetRevision: HEAD
+destination:
+  server: https://kubernetes.default.svc
+  namespace: poc-api
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ApplyOutOfSyncOnly=true
