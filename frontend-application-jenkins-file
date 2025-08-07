@@ -63,7 +63,13 @@ pipeline {
         }
         stage('Delete Images from Jenkins server') {
             steps {
-                sh 'docker image prune -a -f'
+                // script {
+                //     def fullTag = "${env.ECR_REPO}/${env.IMAGE_NAME}:${timestamp}"
+                //     sh "docker rmi ${fullTag}"
+                // }
+                sh 'docker image prune -a -f'  //remove all the images forcefully inlcuding the base image also
+                // sh 'docker builder prune -f'      //Remove unused build cache
+                // sh 'docker system prune -f'    //Remove all stopped containers, unused images, networks, and caches
             }
         }
         stage('Update Manifest and Push to GitHub') {
