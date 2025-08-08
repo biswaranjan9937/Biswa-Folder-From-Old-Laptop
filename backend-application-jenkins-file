@@ -6,6 +6,8 @@ pipeline {
         AWS_REGION     = 'ap-south-1'
         ECR_REPO       = '663880399834.dkr.ecr.ap-south-1.amazonaws.com'
         IMAGE_NAME     = 'poc-ecr-backend'
+        ONLY_YAML_PATH = 'EKS-MERN-Project/DevOps/Kubernetes-Manifests/Backend/deployment.yaml'
+        SKIP_PIPELINE_FILE = 'skip_pipeline_flag.txt'
     }
 
     stages {
@@ -23,8 +25,30 @@ pipeline {
                 }
             }
         }
+        
+        stage('Check for Code Changes') {
+            steps {
+                script {
+                    def changedFiles = sh(script: 'git diff --name-only HEAD~1 HEAD', returnStdout: true).trim().split("\n")
+                    echo "Changed files: ${changedFiles}"
+
+                    if (changedFiles.size() == 1 && changedFiles[0] == env.ONLY_YAML_PATH) {
+                        echo "✅ Only ${env.ONLY_YAML_PATH} was changed. Skipping full pipeline."
+                        writeFile file: env.SKIP_PIPELINE_FILE, text: 'true'
+                    } else {
+                        echo "🔄 Other files changed. Proceeding with pipeline."
+                        writeFile file: env.SKIP_PIPELINE_FILE, text: 'false'
+                    }
+                }
+            }
+        }
 
         stage('AWS ECR Login') {
+            when {
+                expression {
+                    return fileExists(env.SKIP_PIPELINE_FILE) && readFile(env.SKIP_PIPELINE_FILE).trim() != 'true'
+                }
+            }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'aws-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                     sh '''
@@ -37,6 +61,11 @@ pipeline {
         }
 
         stage('Build Docker Image') {
+            when {
+                expression {
+                    return fileExists(env.SKIP_PIPELINE_FILE) && readFile(env.SKIP_PIPELINE_FILE).trim() != 'true'
+                }
+            }
             steps {
                 dir('EKS-MERN-Project/backend') {
                     script {
@@ -54,6 +83,11 @@ pipeline {
         // }
 
         stage('Push to ECR') {
+            when {
+                expression {
+                    return fileExists(env.SKIP_PIPELINE_FILE) && readFile(env.SKIP_PIPELINE_FILE).trim() != 'true'
+                }
+            }
             steps {
                 script {
                     def fullTag = "${env.ECR_REPO}/${env.IMAGE_NAME}:${timestamp}"
@@ -62,11 +96,21 @@ pipeline {
             }
         }
         stage('Delete Images from Jenkins server') {
+            when {
+                expression {
+                    return fileExists(env.SKIP_PIPELINE_FILE) && readFile(env.SKIP_PIPELINE_FILE).trim() != 'true'
+                }
+            }
             steps {
                 sh 'docker image prune -a -f'
             }
         }
         stage('Update Manifest and Push to GitHub') {
+            when {
+                expression {
+                    return fileExists(env.SKIP_PIPELINE_FILE) && readFile(env.SKIP_PIPELINE_FILE).trim() != 'true'
+                }
+            }
             steps {
                 script {
                     // def timestamp = new Date().format("yyyyMMdd-HHmmss")
@@ -89,11 +133,15 @@ pipeline {
         }
     }
     post {
-        success {
-            echo '✅ Build and Push to ECR successful!'
-        }
-        failure {
-            echo '❌ Build failed!'
+        always {
+            script {
+                def skipped = fileExists(env.SKIP_PIPELINE_FILE) ? readFile(env.SKIP_PIPELINE_FILE).trim() == 'true' : false
+                if (skipped) {
+                    echo "✅ Post: Pipeline was skipped due to only deployment.yaml changes."
+                } else {
+                    echo "✅ Post: Pipeline ran full stages."
+                }
+            }
         }
     }
 }
